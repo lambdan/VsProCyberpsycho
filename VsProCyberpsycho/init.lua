@@ -17,7 +17,7 @@ local conversion_rate = 10.0
 local ShouldShowTrickDisplay = true
 local TrickDisplayMaxLines = 3
 local TrickDisplayMaxLineLength = 60
-local TrickDisplay_FontScale = 3
+local TrickDisplay_FontScale = 1
 local TrickDisplay_PosW = 700
 local TrickDisplay_PosH = 700
 local SpeedBonus_TimeLimit = 2
@@ -162,7 +162,7 @@ registerForEvent('onDraw', function()
 		ImGui.SetNextWindowPos(TrickDisplay_PosW, TrickDisplay_PosH)
 		ImGui.Begin("Trick Display", true, ImGuiWindowFlags.NoBackground + ImGuiWindowFlags.NoTitleBar + ImGuiWindowFlags.NoMove + ImGuiWindowFlags.NoScrollbar + ImGuiWindowFlags.AlwaysAutoResize + ImGuiWindowFlags.NoResize)
 
-		ImGui.SetWindowFontScale(TrickDisplay_FontScale)
+		ImGui.SetWindowFontScale(round(TrickDisplay_FontScale))
 		ImGui.TextColored(1,1,1,1, message) -- trick list
 		
 		-- score x multiplier
@@ -179,10 +179,10 @@ registerForEvent('onDraw', function()
 		ImGui.End()
 	end
 
-	if showPopup2_startedAt + 5 > os:clock() then
+	if showPopup2_startedAt + 5 > os:clock() or showSettings then
 		ImGui.SetNextWindowPos(1.5*TrickDisplay_PosW, TrickDisplay_PosH)
 		ImGui.Begin("Trick Reward", true, ImGuiWindowFlags.NoBackground + ImGuiWindowFlags.NoTitleBar + ImGuiWindowFlags.NoMove + ImGuiWindowFlags.NoScrollbar + ImGuiWindowFlags.AlwaysAutoResize + ImGuiWindowFlags.NoResize)
-		ImGui.SetWindowFontScale(TrickDisplay_FontScale*2)
+		ImGui.SetWindowFontScale( round(TrickDisplay_FontScale*2) )
 
 		ImGui.TextColored((81/255), (150/255), (235/255),1, popup2_msg1)
 		ImGui.TextColored(1,1,1,1, popup2_msg2)
@@ -223,7 +223,7 @@ registerForEvent('onDraw', function()
 		end
 		TrickDisplayMaxLines = ImGui.InputInt("\"Trick\" lines", TrickDisplayMaxLines, 1)
 		TrickDisplayMaxLineLength = ImGui.InputInt("\"Trick\" line length", TrickDisplayMaxLineLength, 10)
-		TrickDisplay_FontScale = ImGui.InputFloat("Font scale", TrickDisplay_FontScale, 0.5)
+		TrickDisplay_FontScale = ImGui.InputInt("Font scale", TrickDisplay_FontScale, 1)
 		ImGui.Separator()
 
 		ImGui.Text("Points:")
@@ -287,8 +287,8 @@ end
 function endKillStreak()
 	ToggleMusic("stop")
 
-	local total_score = current_points*multiplier
-	popup2_msg1 = tostring(math.floor(total_score))
+	local total_score = round(current_points*multiplier)
+	popup2_msg1 = tostring(total_score)
 	popup2_msg2 = tostring(current_points) .. " x " .. string.format("%.1f",multiplier)
 	
 	if earnMoney then
@@ -387,7 +387,7 @@ function gotKill(offer)
 end
 
 function PointsToMoney(pts)
-	return math.floor(pts/conversion_rate)
+	return round(pts/conversion_rate)
 end
 
 function tricksToDisplayString(T, MaxLines, MaxLineLength)
@@ -494,9 +494,9 @@ function TryAutoPosition()
 	w,h = GetDisplayResolution()
 
 	-- theres probably some better math you can do here if you're smart
-	TrickDisplay_FontScale = h/540
-	TrickDisplay_PosW = math.floor(w/3.5)
-	TrickDisplay_PosH = math.floor(h*0.78)
+	TrickDisplay_FontScale = round(h/540)
+	TrickDisplay_PosW = round(w/3.5)
+	TrickDisplay_PosH = round(h*0.78)
 
 	TrickDisplayMaxLines = 3
 	TrickDisplayMaxLineLength = 60
@@ -522,4 +522,8 @@ function ToggleMusic(action)
 	local file = io.open("music_state.txt","w")
 	file:write(action)
 	file:close()
+end
+
+function round(n)
+	return math.floor(n + 0.5)
 end
