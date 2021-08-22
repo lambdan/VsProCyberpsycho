@@ -170,8 +170,11 @@ registerForEvent('onDraw', function()
 		ImGui.SameLine()
 		
 		if os:clock() - timeLastKill <= SpeedBonus_TimeLimit then
-			-- color timer different if in speedbonus window
+			-- blue timer if in speedbonus window
 			ImGui.TextColored((80/255), (137/255), (216/255),1, message3)
+		elseif time_remaining <= 3 then
+			-- red timer when almost out
+			ImGui.TextColored(1,0,0,1, message3)
 		else
 			ImGui.TextColored(1,1,1,1, message3)
 		end
@@ -179,14 +182,16 @@ registerForEvent('onDraw', function()
 		ImGui.End()
 	end
 
-	if showPopup2_startedAt + 5 > os:clock() or showSettings then
+	if showPopup2_startedAt + 5 >= os:clock() or showSettings then
 		ImGui.SetNextWindowPos(1.5*TrickDisplay_PosW, TrickDisplay_PosH)
 		ImGui.Begin("Trick Reward", true, ImGuiWindowFlags.NoBackground + ImGuiWindowFlags.NoTitleBar + ImGuiWindowFlags.NoMove + ImGuiWindowFlags.NoScrollbar + ImGuiWindowFlags.AlwaysAutoResize + ImGuiWindowFlags.NoResize)
+		
 		ImGui.SetWindowFontScale( round(TrickDisplay_FontScale*2) )
+		ImGui.TextColored((81/255), (150/255), (235/255),1, popup2_msg1) -- big total score
 
-		ImGui.TextColored((81/255), (150/255), (235/255),1, popup2_msg1)
-		ImGui.TextColored(1,1,1,1, popup2_msg2)
-		ImGui.TextColored((117/255), (252/255), (84/255) ,1, popup2_msg3)
+		ImGui.SetWindowFontScale( round(TrickDisplay_FontScale*1.3) )
+		ImGui.TextColored(1,1,1,1, popup2_msg2) -- score x multiplier
+		ImGui.TextColored((117/255), (252/255), (84/255) ,1, popup2_msg3) -- money
 
 		ImGui.End()		
 	end
