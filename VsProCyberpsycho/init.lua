@@ -1,32 +1,39 @@
 local VsProCyberpsycho = {
 	title = "V's Pro Cyberpsycho 2077",
-	version = "1.0"
+	version = "1.1"
 }
-
 
 -- configurable:
 local musicEnabled = false
 local earnMoney = true
 local resetTimer = 15.0
-local points_civ = 200
-local points_ganger = 600
-local points_police = 1400
-local points_other = 1000
-local points_cyberpsycho = 4000
-local conversion_rate = 10.0
-local ShouldShowTrickDisplay = true
+local points_civ = 50
+local points_ganger = 200
+local points_police = 400
+local points_cyberpsycho = 9000
+local conversion_rate = 10
+local ShouldShowTrickDisplay = false
+local ShouldShowRewardDisplay = false
+local UseGameHUDMessages = true
+local ShouldShowRewardNotification = true
+local UseGameHUDWarning = false
 local TrickDisplayMaxLines = 3
 local TrickDisplayMaxLineLength = 60
 local TrickDisplay_FontScale = 1
 local TrickDisplay_PosW = 700
 local TrickDisplay_PosH = 700
-local SpeedBonus_TimeLimit = 2
-local SpeedBonus_AddMultiplier = 0.1
+local SpeedBonus_Enabled = true
+local SpeedBonus_TimeLimit = 2.5
+local SpeedBonus_AddMultiplier = 0.2
+local PayoutThreshold = 5000
 --------------------------------------
 
 local GameSession = require("Modules/GameSession.lua")
 local GameSettings = require("Modules/GameSettings.lua")
 local GameUI = require("Modules/GameUI.lua")
+local GameHUD = require("Modules/GameHUD.lua")
+
+local userSettingsFile = "settings.v2.json"
 
 local showSettings = false
 local showPopup1 = false
@@ -48,6 +55,13 @@ local popup2_msg3 = "$999"
 
 local originalCarVolume = 0
 local originalMusicVolume = 0
+
+local CurrentMessage = ""
+local LastMessage = 0
+
+local PayoutAmountDue = 0
+
+local points_other = (points_civ + points_ganger + points_police + points_cyberpsycho) / 4
 
 function IsPlayer(target)
 	return target and target:GetEntityID().hash == Game.GetPlayer():GetEntityID().hash
@@ -105,8 +119,7 @@ registerForEvent('onInit', function()
 	originalCarVolume = GameSettings.Get("/audio/volume/CarRadioVolume")
 	originalMusicVolume = GameSettings.Get("/audio/volume/MusicVolume")
 
-	if not load_settings("settings.json") then
-		load_settings("defaults.json")
+	if not load_settings(userSettingsFile) then
 		TryAutoPosition()
 	end
 
@@ -134,7 +147,7 @@ registerForEvent('onDraw', function()
 
 	if killStreak > 0 then
 		time_remaining = resetTimer - (os:clock() - timeLastKill)
-		duration = os:clock() - killstreak_started
+		--duration = os:clock() - killstreak_started
 
 		if time_remaining <= 0 then
 			endKillStreak()
@@ -182,7 +195,7 @@ registerForEvent('onDraw', function()
 		ImGui.End()
 	end
 
-	if showPopup2_startedAt + 5 >= os:clock() or showSettings then
+	if ShouldShowRewardDisplay and showPopup2_startedAt + 5 >= os:clock() or showSettings and ShouldShowRewardDisplay then
 		ImGui.SetNextWindowPos(1.5*TrickDisplay_PosW, TrickDisplay_PosH)
 		ImGui.Begin("Trick Reward", true, ImGuiWindowFlags.NoBackground + ImGuiWindowFlags.NoTitleBar + ImGuiWindowFlags.NoMove + ImGuiWindowFlags.NoScrollbar + ImGuiWindowFlags.AlwaysAutoResize + ImGuiWindowFlags.NoResize)
 		
@@ -200,7 +213,80 @@ registerForEvent('onDraw', function()
 	if (showSettings) then
 		ImGui.Begin(VsProCyberpsycho.title)
 		
-		ImGui.Text("Playing music requires external tool!")
+		ImGui.Text("Killstreak Time Limit:")
+		resetTimer = ImGui.InputFloat("Time Limit", resetTimer, 5.0)
+		ImGui.Separator()
+
+		ImGui.Text("Game HUD:")
+		if ImGui.Button("Use Notifications for Kills") then
+			UseGameHUDMessages = not UseGameHUDMessages
+		end
+		ImGui.SameLine()
+		ImGui.Text(tostring(UseGameHUDMessages))
+		if ImGui.Button("Show Killstreak Finished Notification") then
+			ShouldShowRewardNotification = not ShouldShowRewardNotification
+		end
+		ImGui.SameLine()
+		ImGui.Text(tostring(ShouldShowRewardNotification))
+
+		if ImGui.Button("Use Relic Warning for Killstreak Finished instead") then
+			UseGameHUDWarning = not UseGameHUDWarning
+		end
+		ImGui.SameLine()
+		ImGui.Text(tostring(UseGameHUDWarning))
+		ImGui.Separator()
+
+		ImGui.Text("THPS-Style Trick Display:")
+		if ImGui.Button("Enabled") then
+			ShouldShowTrickDisplay = not ShouldShowTrickDisplay
+		end
+		ImGui.SameLine()
+		ImGui.Text(tostring(ShouldShowTrickDisplay))
+		if ImGui.Button("Ugly reward display") then
+			ShouldShowRewardDisplay = not ShouldShowRewardDisplay
+		end
+		ImGui.SameLine()
+		ImGui.Text(tostring(ShouldShowRewardDisplay))
+		TrickDisplay_PosW = ImGui.InputInt("Horizontal Pos.", TrickDisplay_PosW, 10)
+		TrickDisplay_PosH = ImGui.InputInt("Vertical Pos.", TrickDisplay_PosH, 10)
+		TrickDisplay_FontScale = ImGui.InputInt("Font Scale", TrickDisplay_FontScale, 1)
+		if ImGui.Button("Try to Auto Position") then
+			TryAutoPosition()
+		end
+		TrickDisplayMaxLines = ImGui.InputInt("Lines", TrickDisplayMaxLines, 1)
+		TrickDisplayMaxLineLength = ImGui.InputInt("Line length", TrickDisplayMaxLineLength, 10)
+		ImGui.Separator()
+
+		ImGui.Text("Points:")
+		points_civ = ImGui.InputInt("Civilian", points_civ, 100)
+		points_ganger = ImGui.InputInt("Gang", points_ganger, 100)
+		points_police = ImGui.InputInt("Police", points_police, 100)
+		points_cyberpsycho = ImGui.InputInt("Cyberpsycho", points_cyberpsycho, 100)
+		ImGui.Separator()
+
+		ImGui.Text("Money:")
+		if ImGui.Button("Earn Money") then
+			earnMoney = not earnMoney
+		end
+		ImGui.SameLine()
+		ImGui.Text(tostring(earnMoney))
+		conversion_rate = ImGui.InputFloat("Conversion Rate", conversion_rate, 1.0)
+		ImGui.Text("1000 points = $" .. tostring(PointsToMoney(1000)))
+		PayoutThreshold = ImGui.InputInt("Payout Threshold", PayoutThreshold, 1000)
+		ImGui.Text("(current due: " .. tostring(PayoutAmountDue) .. ")")
+		ImGui.Separator()
+
+		ImGui.Text("Speed Bonus:")
+		if ImGui.Button("Speed Bonus Enabled") then
+			SpeedBonus_Enabled = not SpeedBonus_Enabled
+		end
+		ImGui.SameLine()
+		ImGui.Text(tostring(SpeedBonus_Enabled))
+		SpeedBonus_TimeLimit = ImGui.InputFloat("Speed Bonus Time Window", SpeedBonus_TimeLimit, 0.5)
+		SpeedBonus_AddMultiplier = ImGui.InputFloat("Multiplier Add", SpeedBonus_AddMultiplier, 0.1)
+		ImGui.Separator()
+
+		ImGui.Text("Play Music:")
 		if ImGui.Button("Music enabled") then
 			musicEnabled = not musicEnabled
 			if killStreak > 0 and musicEnabled then
@@ -211,53 +297,15 @@ registerForEvent('onDraw', function()
 		end
 		ImGui.SameLine()
 		ImGui.Text(tostring(musicEnabled))
-
-		resetTimer = ImGui.InputFloat("Time Limit", resetTimer, 5.0)
-		ImGui.Separator()
-
-		ImGui.Text("Display:")
-		if ImGui.Button("Trick display") then
-			ShouldShowTrickDisplay = not ShouldShowTrickDisplay
-		end
-		ImGui.SameLine()
-		ImGui.Text(tostring(ShouldShowTrickDisplay))
-		TrickDisplay_PosW = ImGui.InputInt("Horizontal Pos.", TrickDisplay_PosW, 10)
-		TrickDisplay_PosH = ImGui.InputInt("Vertical Pos.", TrickDisplay_PosH, 10)
-		if ImGui.Button("Try to Auto Position") then
-			TryAutoPosition()
-		end
-		TrickDisplayMaxLines = ImGui.InputInt("\"Trick\" lines", TrickDisplayMaxLines, 1)
-		TrickDisplayMaxLineLength = ImGui.InputInt("\"Trick\" line length", TrickDisplayMaxLineLength, 10)
-		TrickDisplay_FontScale = ImGui.InputInt("Font scale", TrickDisplay_FontScale, 1)
-		ImGui.Separator()
-
-		ImGui.Text("Points:")
-		points_civ = ImGui.InputInt("Civilian", points_civ, 100)
-		points_ganger = ImGui.InputInt("Gang", points_ganger, 100)
-		points_police = ImGui.InputInt("Police", points_police, 100)
-		points_cyberpsycho = ImGui.InputInt("Cyberpsycho", points_cyberpsycho, 100)
-		--points_other = ImGui.InputInt("Unknown", points_other, 100)
-		ImGui.Text("Points to $ Conversion Rate")
-		conversion_rate = ImGui.InputFloat("Conversion Rate", conversion_rate, 1.0)
-		ImGui.Text("1000 points = $" .. tostring(PointsToMoney(1000)))
-		if ImGui.Button("Earn money") then
-			earnMoney = not earnMoney
-		end
-		ImGui.SameLine()
-		ImGui.Text(tostring(earnMoney))
-		ImGui.Separator()
-
-		ImGui.Text("Speed Bonus:")
-		SpeedBonus_TimeLimit = ImGui.InputFloat("Speedonus Time Window", SpeedBonus_TimeLimit, 0.5)
-		SpeedBonus_AddMultiplier = ImGui.InputFloat("Added to Multiplier", SpeedBonus_AddMultiplier, 0.1)
+		ImGui.Text("(requires external tool)")
 		ImGui.Separator()
 
 		if ImGui.Button("Save settings") then
-			save_settings("settings.json")
+			save_settings(userSettingsFile)
 		end
 		ImGui.SameLine()
 		if ImGui.Button("Load settings") then
-			load_settings("settings.json")
+			load_settings(userSettingsFile)
 		end
 
 		if ImGui.Button("Load defaults") then
@@ -292,15 +340,41 @@ end
 function endKillStreak()
 	ToggleMusic("stop")
 
+	duration = os:clock() - killstreak_started
+
 	local total_score = round(current_points*multiplier)
 	popup2_msg1 = tostring(total_score)
 	popup2_msg2 = tostring(current_points) .. " x " .. string.format("%.1f",multiplier)
 	
 	if earnMoney then
-		Game.AddToInventory("Items.money", PointsToMoney(total_score))
+		PayoutAmountDue = PayoutAmountDue + PointsToMoney(total_score)
+		--Game.AddToInventory("Items.money", PointsToMoney(total_score))
 		popup2_msg3 = "+ $" .. tostring(PointsToMoney(total_score))
 	else
 		popup2_msg3 = ""
+	end
+
+	if PayoutAmountDue >= PayoutThreshold then
+		Game.AddToInventory("Items.money", PointsToMoney(PayoutAmountDue))
+		PayoutAmountDue = 0
+	end
+
+	if ShouldShowRewardNotification then
+		-- generate hud message
+		local hud_msg = "KILLSTREAK FINISHED: " .. tostring(killStreak) .. " KILLS\n"
+		hud_msg = hud_msg .. tostring(current_points) .. " X " .. string.format("%.1f",multiplier) .. " = " .. tostring(total_score) .. "\n"
+		--hud_msg = hud_msg .. "DURATION: " .. string.format("%.1f",duration) .. " SECONDS"
+		--if earnMoney then -- seems redundant since game's Transfer popup comes up anyway
+		--	hud_msg = hud_msg .. "\n+ $" .. tostring(PointsToMoney(total_score))
+		--end
+
+		if UseGameHUDWarning and ShouldShowRewardNotification then
+			HUDWarning(hud_msg, 5.0)
+		elseif UseGameHUDMessages and ShouldShowRewardNotification then
+			HUDNotification(hud_msg)
+		end
+
+		
 	end
 	
 	tricks = {}
@@ -339,6 +413,7 @@ function gotKill(offer)
 
 	---- do some multiplication if fancier enemies
 	---- TODO more: TraumaTeam etc.
+	---- TODO make these settings
 
 	-- check level if any
 	if string.find(offer, "Lvl2") then
@@ -373,14 +448,16 @@ function gotKill(offer)
 	print("Killed:", offer, "(" .. tostring(points_worth) .. ")")
 	
 	-- if speed bonus
-	if os:clock() - timeLastKill <= SpeedBonus_TimeLimit then
-		print("Got Speedbonus!")
+	if SpeedBonus_Enabled and os:clock() - timeLastKill <= SpeedBonus_TimeLimit then
 		multiplier = multiplier + SpeedBonus_AddMultiplier
+		HUDNotification("SPEED BONUS +" .. string.format("%.1f", SpeedBonus_AddMultiplier) .. "X (" .. string.format("%.1f", multiplier) .. "X)")
 	end
 	multiplier = multiplier + 1 -- add 1 kill
 
 	points_to_add = points_worth
 	current_points = current_points + points_to_add
+
+	HUDNotification(offer .. " +" .. tostring(points_to_add))
 
 	if killStreak == 1 then
 		killstreak_started = os:clock()
@@ -392,7 +469,7 @@ function gotKill(offer)
 end
 
 function PointsToMoney(pts)
-	return round(pts/conversion_rate)
+	return math.floor(pts/conversion_rate)
 end
 
 function tricksToDisplayString(T, MaxLines, MaxLineLength)
@@ -438,7 +515,6 @@ function save_settings(filename)
 		points_civ = points_civ,
 		points_ganger = points_ganger,
 		points_police = points_police,
-		points_other = points_other,
 		points_cyberpsycho = points_cyberpsycho,
 		conversion_rate = conversion_rate,
 		ShouldShowTrickDisplay = ShouldShowTrickDisplay,
@@ -447,8 +523,14 @@ function save_settings(filename)
 		TrickDisplay_FontScale = TrickDisplay_FontScale,
 		TrickDisplay_PosW = TrickDisplay_PosW,
 		TrickDisplay_PosH = TrickDisplay_PosH,
+		SpeedBonus_Enabled = SpeedBonus_Enabled,
 		SpeedBonus_TimeLimit = SpeedBonus_TimeLimit,
-		SpeedBonus_AddMultiplier = SpeedBonus_AddMultiplier
+		SpeedBonus_AddMultiplier = SpeedBonus_AddMultiplier,
+		ShouldShowRewardDisplay = ShouldShowRewardDisplay,
+		UseGameHUDMessages = UseGameHUDMessages,
+		UseGameHUDWarning = UseGameHUDWarning,
+		ShouldShowRewardNotification = ShouldShowRewardNotification,
+		PayoutThreshold = PayoutThreshold
 	}
 	local file = io.open(filename, "w")
 	local j = json.encode(data)
@@ -474,17 +556,23 @@ function load_settings(filename)
 	points_civ = j["points_civ"]
 	points_ganger = j["points_ganger"]
 	points_police = j["points_police"]
-	points_other = j["points_other"]
 	points_cyberpsycho = j["points_cyberpsycho"]
 	conversion_rate = j["conversion_rate"]
 	ShouldShowTrickDisplay = j["ShouldShowTrickDisplay"]
+	ShouldShowRewardDisplay = j["ShouldShowRewardDisplay"]
 	TrickDisplayMaxLines = j["TrickDisplayMaxLines"]
 	TrickDisplayMaxLineLength = j["TrickDisplayMaxLineLength"]
 	TrickDisplay_FontScale = j["TrickDisplay_FontScale"]
 	TrickDisplay_PosW = j["TrickDisplay_PosW"]
 	TrickDisplay_PosH = j["TrickDisplay_PosH"]
+	SpeedBonus_Enabled = j["SpeedBonus_Enabled"]
 	SpeedBonus_TimeLimit = j["SpeedBonus_TimeLimit"]
 	SpeedBonus_AddMultiplier = j["SpeedBonus_AddMultiplier"]
+	UseGameHUDMessages = j["UseGameHUDMessages"]
+	UseGameHUDWarning = j["UseGameHUDWarning"]
+	ShouldShowRewardNotification = j["ShouldShowRewardNotification"]
+	PayoutThreshold = j["PayoutThreshold"]
+
 
 	print("Vs Pro Cyberpsycho: loaded settings from " .. filename)
 	return true
@@ -531,4 +619,27 @@ end
 
 function round(n)
 	return math.floor(n + 0.5)
+end
+
+function HUDNotification(msg)
+	if not UseGameHUDMessages then
+		return
+	end
+
+	if os:clock() - LastMessage <= 1 then
+		CurrentMessage = msg .. "\n" .. CurrentMessage
+	else
+		CurrentMessage = msg
+	end
+
+	GameHUD.ShowMessage(CurrentMessage)
+	LastMessage = os:clock()
+end
+
+function HUDWarning(msg, length)
+	if not UseGameHUDMessages then
+		return
+	end
+
+	GameHUD.ShowWarning(msg, length)
 end
