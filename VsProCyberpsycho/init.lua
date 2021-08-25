@@ -358,7 +358,7 @@ function endKillStreak()
 	end
 
 	if PayoutAmountDue > 0 and PayoutAmountDue >= PayoutThreshold then
-		Game.AddToInventory("Items.money", PointsToMoney(PayoutAmountDue))
+		Game.AddToInventory("Items.money", PayoutAmountDue)
 		PayoutAmountDue = 0
 	end
 
