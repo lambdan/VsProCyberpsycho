@@ -273,6 +273,9 @@ registerForEvent('onDraw', function()
 		conversion_rate = ImGui.InputFloat("Conversion Rate", conversion_rate, 1.0)
 		ImGui.Text("1000 points = $" .. tostring(PointsToMoney(1000)))
 		PayoutThreshold = ImGui.InputInt("Payout Threshold", PayoutThreshold, 1000)
+		if PayoutThreshold < 0 then
+			PayoutThreshold = 0
+		end
 		ImGui.Text("(current due: " .. tostring(PayoutAmountDue) .. ")")
 		ImGui.Separator()
 
@@ -354,7 +357,7 @@ function endKillStreak()
 		popup2_msg3 = ""
 	end
 
-	if PayoutAmountDue >= PayoutThreshold then
+	if PayoutAmountDue > 0 and PayoutAmountDue >= PayoutThreshold then
 		Game.AddToInventory("Items.money", PointsToMoney(PayoutAmountDue))
 		PayoutAmountDue = 0
 	end
